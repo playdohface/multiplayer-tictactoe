@@ -914,7 +914,9 @@ dependencies = [
  "actix-web",
  "actix-web-lab",
  "env_logger",
+ "log",
  "nanoid",
+ "rand",
 ]
 
 [[package]]
