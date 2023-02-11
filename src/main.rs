@@ -1,11 +1,13 @@
 #![allow(unused)]
 
 use actix_web::{
-    get, http::header, middleware::Logger, post, web, App, HttpResponse, HttpServer, Responder,
+    get, http::{header, StatusCode}, middleware::Logger, post, web, App, HttpResponse, HttpServer, Responder,
 };
+use actix_files::{self as fs, NamedFile};
 use gamemanager::GameManager;
 use nanoid::nanoid;
 use std::{
+    path::PathBuf,
     collections::HashMap,
     sync::{Arc, Mutex},
 };
@@ -24,8 +26,10 @@ async fn main() -> Result<(), std::io::Error> {
             .app_data(web::Data::from(Arc::clone(&gm)))
             .service(index)
             .service(newgame)
-            .service(game)
+            .service(game_events)
+            //.service(game)
             .service(addmove)
+            .service(fs::Files::new("/{gameid}", "client"))
             .wrap(Logger::default())
     })
     .bind(("127.0.0.1", 8080))?
@@ -42,25 +46,40 @@ async fn index() -> impl Responder {
 #[get("/newgame")]
 async fn newgame(games: web::Data<GameManager>) -> impl Responder {
     let gameid = nanoid!(8);
-    match games.newgame(gameid.clone()) {
+    let gameurl = format!("{gameid}/client.html");
+    match games.newgame(gameid) {
         Ok(_) => HttpResponse::Found()
-            .append_header((header::LOCATION, gameid))
+            .append_header((header::LOCATION, gameurl))
             .finish(),
         Err(e) => HttpResponse::InternalServerError().finish(),
     }
 }
 
-#[get("/{game_id}")]
-async fn game(
+#[get("/{game_id}/{file}")]
+async fn game(filename: web::Path<(String, String)>) -> impl Responder {
+    let (_, file) = filename.into_inner();
+    let file = format!("./client/{file}");
+    log::info!("{:?}", file);
+    let path:PathBuf = file.parse().unwrap();
+    NamedFile::open(path).unwrap()
+    
+}
+
+#[get("/{game_id}/events")]
+async fn game_events(
     id: web::Path<String>,
     gm: web::Data<GameManager>,
 ) -> impl Responder {
+    log::info!("Looking for Game {}", &id);
     match gm.getgame(id.into_inner()) {
         Some(g) => {
-            g.show()
-            
+            log::info!("Game Found, Joining...");
+            Some(g.join().await)           
         },
-        None => "Game not found!".to_string()
+        None => {
+            log::error!("Could not find game!");
+            None
+        }
     }
 }
 
@@ -73,10 +92,13 @@ async fn addmove(
     match gm.getgame(id) {
         Some(g) => {
             
-            g.addmove(newmove);
-            g.show()
-            
+            if g.addmove(newmove) {
+                g.show().await;
+                "Move Accepted"
+            } else {
+                "Invalid Move!"
+            }                        
         },
-        None => "Game not found!".to_string()
+        None => "Game not found!"
     }
 }

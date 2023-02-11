@@ -1,6 +1,7 @@
 /// Module to store Types and logic related to the Game
 use rand::seq::SliceRandom;
 use std::fmt::Display;
+use serde::Serialize;
 
 pub fn best_next_move(b: &Board, lvl: &Difficulty) -> usize {
     let winconditions = [
@@ -151,7 +152,7 @@ impl Difficulty {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Serialize)]
 pub enum Field {
     X,
     O,
@@ -167,7 +168,7 @@ impl Display for Field {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug, Serialize)]
 pub enum Player {
     X,
     O,
@@ -200,10 +201,10 @@ impl std::convert::TryFrom<Field> for Player {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Board {
     fields: [Field; 9],
-    next_turn: Player,
+    pub next_turn: Player,
 }
 
 impl Board {
@@ -227,8 +228,9 @@ impl Board {
         }
     }
 
-    pub fn show(&self) -> String {
-        format!(
+    pub fn show(&self) -> [Field; 9] {
+        self.fields
+       /*  format!(
             "{}|{}|{}\n{}|{}|{}\n{}|{}|{}\n",
             self.fields[0],
             self.fields[1],
@@ -239,10 +241,11 @@ impl Board {
             self.fields[6],
             self.fields[7],
             self.fields[8]
-        )
+        ) */
     }
-
-    pub fn get_winner(&self) -> Option<Field> {
+    /// If theres a winner, returns Some(Winnerfield, wincondition), Some(Field::Empty, 10) for draw
+    /// None if the game is undecided
+    pub fn get_winner(&self) -> Option<(Field,usize)> {
         let winconditions = [
             [0, 1, 2],
             [3, 4, 5],
@@ -254,9 +257,9 @@ impl Board {
             [2, 4, 6],
         ]; // diagonal
         let mut blocked: usize = 0;
-        for condition in winconditions {
+        for (i, condition) in winconditions.iter().enumerate() {
             let mut curr: Vec<Field> = Vec::new();
-            for index in condition {
+            for index in *condition {
                 curr.push(*self.fields.get(index).unwrap());
             }
 
@@ -268,10 +271,10 @@ impl Board {
             } else {
                 match curr[0] {
                     Field::X => {
-                        return Some(Field::X);
+                        return Some((Field::X,i));
                     }
                     Field::O => {
-                        return Some(Field::O);
+                        return Some((Field::O,i));
                     }
                     Field::Empty => panic!("Winner can not be empty field"),
                 }
@@ -279,7 +282,7 @@ impl Board {
         }
         if blocked == winconditions.len() {
             // it's a draw
-            Some(Field::Empty)
+            Some((Field::Empty,10))
         } else {
             // the outcome is not yet determined
             None

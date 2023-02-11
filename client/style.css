@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
+
+body {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+.boardcontainer {
+
+    display:flex;
+    justify-content: center;
+}
+
+h1 {
+    font-family: 'Permanent Marker', cursive;
+    text-align: center;
+}
+.title {
+    color: #fff;
+    font-size: 3em;
+    text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;  
+}
+
+.notification {
+    font-size: large;
+    font-family: 'Permanent Marker', cursive;
+    padding: 1em;
+    background: transparent;
+    margin-top:30px;
+    max-width: 200px;
+    height: 50px;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+
+}
+.notification h1{
+    margin: 0;
+}
+
+.jump {
+    animation: jump ease-in-out 0.3s;
+
+}
+
+@keyframes jump {
+
+    50% {
+        transform: translateY(-0.5em) 
+    }
+}
+
+.field {
+
+    background: white;
+    transition: ease-in-out 0.5s;
+    overflow: hidden;
+    width:100%;
+
+}
+.field:hover{
+border: 1px dashed green;
+}
+
+#board {
+    position:relative;
+    width: 70vmin;
+    height: 70vmin; 
+
+    background: radial-gradient(#000000FF 0, #00000000 90%, #FFFFFF 100%);
+    background-size: contain;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 20px;
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3,1fr);
+    grid-row-gap: 2px;
+    grid-column-gap: 2px;
+    grid-area: auto;
+}
+.overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    display: none;   
+}
+
+.leftstroke {
+    stroke-dasharray: 230; 
+    stroke-dashoffset: 0;
+    animation: dashdraw 0.2s ease-in reverse;
+ }
+ 
+ .rightstroke {   
+     stroke-dasharray: 250; 
+     stroke-dashoffset: 250;
+     animation: dashdraw2 0.2s ease-in reverse ;
+     animation-delay: 0.3s;
+     animation-fill-mode: forwards;
+ }
+
+ .slowrightstroke, .sidestroke, .downstroke {   
+    stroke-dasharray: 250; 
+    stroke-dashoffset: 250;
+    animation: dashdraw2 1s ease-in reverse ;
+    animation-delay: 0.5s;
+    animation-fill-mode: forwards;
+}
+.slowleftstroke {
+    stroke-dasharray: 230; 
+    stroke-dashoffset: 0;
+    animation: dashdraw 1s ease-in reverse; 
+}
+ 
+.o-path{
+     stroke-dasharray: 500; 
+     stroke-dashoffset: 500;
+     animation: dashdraw3 0.4s ease-in ;
+     animation-fill-mode: forwards;
+}
+
+.scribble {
+    stroke-dasharray: 2000;
+    stroke-dashoffset: 2000;
+    animation: scribbleanim 2s linear;
+    animation-fill-mode: forwards;
+    stroke: #FFFFFF;
+    stroke-width: 96;
+ }
+ @keyframes scribbleanim {
+    to {
+        stroke-dashoffset: 0;
+    }
+ }
+ @keyframes dashdraw {
+     to {
+         stroke-dashoffset: 220;
+     }
+ }
+ 
+ @keyframes dashdraw2 {
+     from {
+         stroke-dashoffset: 0;
+     }
+     to {
+         stroke-dashoffset: 250;
+     }
+ }
+ 
+ @keyframes dashdraw3 {
+     from {
+         stroke-dashoffset: 500;
+     }
+     to {
+         stroke-dashoffset: 0;
+     }
+ }
