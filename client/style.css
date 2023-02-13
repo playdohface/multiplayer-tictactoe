@@ -25,20 +25,18 @@ h1 {
     1px 1px 0 #000;  
 }
 
-.notification {
-    font-size: large;
+#notifications {
+    font-size: x-large;
     font-family: 'Permanent Marker', cursive;
     padding: 1em;
     background: transparent;
     margin-top:30px;
-    max-width: 200px;
-    height: 50px;
     text-align: center;
     margin-left: auto;
     margin-right: auto;
 
 }
-.notification h1{
+#notifications h1{
     margin: 0;
 }
 

@@ -1,9 +1,10 @@
 #![allow(unused)]
 
 use actix_web::{
-    get, http::{header, StatusCode}, middleware::Logger, post, web, App, HttpResponse, HttpServer, Responder,
+    cookie::Key, get, http::{header, StatusCode}, middleware::Logger, post, web, App, HttpResponse, HttpServer, Responder,
 };
 use actix_files::{self as fs, NamedFile};
+use actix_session::{SessionMiddleware, storage::CookieSessionStore, Session};
 use gamemanager::GameManager;
 use nanoid::nanoid;
 use std::{
@@ -17,17 +18,19 @@ pub mod tictactoe;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
-    let gm = GameManager::init();
 
+    
+
+    let gm = GameManager::init();
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::from(Arc::clone(&gm)))
+            .app_data(web::Data::from(Arc::clone(&gm)))            
             .service(index)
             .service(newgame)
             .service(game_events)
-            //.service(game)
+            .service(game)
             .service(addmove)
             .service(fs::Files::new("/{gameid}", "client"))
             .wrap(Logger::default())
@@ -46,7 +49,7 @@ async fn index() -> impl Responder {
 #[get("/newgame")]
 async fn newgame(games: web::Data<GameManager>) -> impl Responder {
     let gameid = nanoid!(8);
-    let gameurl = format!("{gameid}/client.html");
+    let gameurl = format!("{gameid}/game");
     match games.newgame(gameid) {
         Ok(_) => HttpResponse::Found()
             .append_header((header::LOCATION, gameurl))
@@ -55,11 +58,10 @@ async fn newgame(games: web::Data<GameManager>) -> impl Responder {
     }
 }
 
-#[get("/{game_id}/{file}")]
-async fn game(filename: web::Path<(String, String)>) -> impl Responder {
-    let (_, file) = filename.into_inner();
-    let file = format!("./client/{file}");
-    log::info!("{:?}", file);
+#[get("/{game_id}/game")]
+async fn game(id: web::Path<String>) -> impl Responder {
+    let id = id.into_inner();
+    let file = format!("client/client.html");
     let path:PathBuf = file.parse().unwrap();
     NamedFile::open(path).unwrap()
     
@@ -69,12 +71,14 @@ async fn game(filename: web::Path<(String, String)>) -> impl Responder {
 async fn game_events(
     id: web::Path<String>,
     gm: web::Data<GameManager>,
+    
 ) -> impl Responder {
-    log::info!("Looking for Game {}", &id);
-    match gm.getgame(id.into_inner()) {
+    let id = id.into_inner();
+    match gm.getgame(id.clone()) {
         Some(g) => {
-            log::info!("Game Found, Joining...");
-            Some(g.join().await)           
+            let (stream, player) = g.join().await;
+            
+            Some(stream)           
         },
         None => {
             log::error!("Could not find game!");
@@ -83,22 +87,24 @@ async fn game_events(
     }
 }
 
-#[post("/{game_id}/{move}")]
+#[post("/{game_id}/{move}/{credentials}")]
 async fn addmove(
-    path: web::Path<(String, usize)>,
+    path: web::Path<(String, usize, String)>,
     gm: web::Data<GameManager>,
+
 ) -> impl Responder {
-    let (id, newmove) = path.into_inner();
+    let (id, newmove, credentials) = path.into_inner();
+
     match gm.getgame(id) {
-        Some(g) => {
-            
-            if g.addmove(newmove) {
+        Some(g) => {          
+            if g.addmove(newmove, credentials) {
                 g.show().await;
-                "Move Accepted"
+                g.notify_players().await;
+                HttpResponse::Ok().finish()
             } else {
-                "Invalid Move!"
+                HttpResponse::BadRequest().finish()
             }                        
         },
-        None => "Game not found!"
+        None => HttpResponse::NotFound().finish()
     }
 }

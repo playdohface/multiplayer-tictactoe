@@ -142,9 +142,9 @@ const graphics = {
 
 let addmove = (fieldindex) => {
         //console.log(fieldindex);
-        fetch('./'.concat(fieldindex), { method: 'POST' })
+        fetch('./'.concat(fieldindex,'/',credentials), { method: 'POST' })
         .then((response) => {        
-            console.log(response);                   
+            console.log(response.status);                   
         });
 }
 
@@ -197,9 +197,10 @@ let showvictory = (condition) => {
    }
 }
 
-let messages = document.getElementById("notifications");
+let notifications = document.getElementById("notifications");
 let board = document.getElementById("board");
 let fields = [];
+let credentials = "";
 
 for (let i = 0 ; i <= 8 ; i++) {
     let newelem = document.createElement("div");
@@ -224,6 +225,15 @@ events.onmessage = (event) => {
       showvictory(outcome[1]);
     }
 }
+events.addEventListener("notification", (event) => {
+   notifications.innerText = event.data;
+   console.log("Notification: ",event.data);
+})
+
+events.addEventListener("credentials", (event) => {
+   credentials = event.data;
+   console.log("Notification: ",event.data);
+})
 
         
 

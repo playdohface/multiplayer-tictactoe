@@ -58,7 +58,10 @@ pub struct Game {
 #[derive(Debug, Clone)]
 struct GameInner {
     pub board: tictactoe::Board,
+    pub nextup: tictactoe::Player,
+    pub ready: bool,
     spectators: Vec<sse::Sender>,
+    credentials: [String;2],
 }
 impl Game {
     pub fn new() -> Arc<Self> {
@@ -66,21 +69,60 @@ impl Game {
                 Game {
                     inner: Mutex::new( GameInner {
                         board: tictactoe::Board::new(),
-                    spectators: Vec::new(),
+                        nextup: tictactoe::Player::X,
+                        ready: false,
+                        spectators: Vec::new(),
+                        credentials: [nanoid::nanoid!(12), nanoid::nanoid!(12) ],
             } )
         })
     }
-    pub async fn join(&self) -> sse::Sse<ChannelStream>{
+    pub async fn notify_players(&self) {
+        let mut g = self.inner.lock().unwrap();
+        if g.nextup == tictactoe::Player::X {
+            g.spectators[0].send(sse::Data::new("Your move, Player X!").event("notification")).await.unwrap();
+            g.spectators[1].send(sse::Data::new("Wait for your opponent, Player O").event("notification")).await.unwrap();
+        } else {
+            g.spectators[0].send(sse::Data::new("Wait for your opponent, Player X").event("notification")).await.unwrap();
+            g.spectators[1].send(sse::Data::new("Your move, Player O!").event("notification")).await.unwrap();  
+        }
+    }
+    pub async fn join(&self) -> (sse::Sse<ChannelStream>, usize) {
         let (tx, rx) = sse::channel(5);
-        //tx.send(sse::Data::new("Spectator Added")).await.unwrap();
-        self.inner.lock().unwrap().spectators.push(tx);
-        rx
+
+        let mut g = self.inner.lock().unwrap();
+        g.spectators.push(tx);
+        if g.spectators.len() == 2 {
+            g.ready = true;
+
+            g.spectators[0].send(sse::Data::new(g.credentials[0].clone()).event("credentials")).await.unwrap();
+            g.spectators[0].send(sse::Data::new("Game Ready! You are Player X, make your move!").event("notification")).await.unwrap();
+
+            g.spectators[1].send(sse::Data::new(g.credentials[1].clone()).event("credentials")).await.unwrap();
+            g.spectators[1].send(sse::Data::new("Game Ready! You are Player O, wait for your opponents move!").event("notification")).await.unwrap();
+
+        } else if g.spectators.len() == 1 {
+            g.spectators[0].send(sse::Data::new("Waiting for opponent.").event("notification")).await.unwrap();
+        }
+        (rx, g.spectators.len())
         
     }
-    pub fn addmove(&self, newmove: usize) -> bool{
+    pub async fn notify_all(&self, msg: String) {
+        let s = self.inner.lock().unwrap().spectators.clone();
+        for spec in s {
+            spec.send(sse::Data::new(msg.clone()).event("notification")).await.unwrap();
+        }
+    }
+    pub fn addmove(&self, newmove: usize, c: String) -> bool{
+        log::info!("Move: {newmove}, Credentials: {c}");
         match self.inner.lock() {
             Ok(mut g) => {
-                g.board.add_turn(newmove)
+                if g.ready && 
+                ((c == g.credentials[0] && g.nextup == tictactoe::Player::X) || (c == g.credentials[1] && g.nextup == tictactoe::Player::O)) {
+                    g.nextup = !g.nextup;
+                    g.board.add_turn(newmove)
+                } else {
+                    false
+                }
                 
             },
             Err(e) => false
