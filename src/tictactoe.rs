@@ -1,7 +1,7 @@
 /// Module to store Types and logic related to the Game
 use rand::seq::SliceRandom;
-use std::fmt::Display;
 use serde::Serialize;
+use std::fmt::Display;
 
 pub fn best_next_move(b: &Board, lvl: &Difficulty) -> usize {
     let winconditions = [
@@ -216,7 +216,7 @@ impl Board {
     }
 
     pub fn add_turn(&mut self, position: usize) -> bool {
-        if position > 8 || self.fields[position] != Field::Empty {
+        if position > 8 || self.fields[position] != Field::Empty || self.get_winner() != None {
             false
         } else {
             match self.next_turn {
@@ -230,7 +230,7 @@ impl Board {
 
     pub fn show(&self) -> [Field; 9] {
         self.fields
-       /*  format!(
+        /*  format!(
             "{}|{}|{}\n{}|{}|{}\n{}|{}|{}\n",
             self.fields[0],
             self.fields[1],
@@ -245,7 +245,7 @@ impl Board {
     }
     /// If theres a winner, returns Some(Winnerfield, wincondition), Some(Field::Empty, 10) for draw
     /// None if the game is undecided
-    pub fn get_winner(&self) -> Option<(Field,usize)> {
+    pub fn get_winner(&self) -> Option<(Field, usize)> {
         let winconditions = [
             [0, 1, 2],
             [3, 4, 5],
@@ -271,10 +271,10 @@ impl Board {
             } else {
                 match curr[0] {
                     Field::X => {
-                        return Some((Field::X,i));
+                        return Some((Field::X, i));
                     }
                     Field::O => {
-                        return Some((Field::O,i));
+                        return Some((Field::O, i));
                     }
                     Field::Empty => panic!("Winner can not be empty field"),
                 }
@@ -282,7 +282,7 @@ impl Board {
         }
         if blocked == winconditions.len() {
             // it's a draw
-            Some((Field::Empty,10))
+            Some((Field::Empty, 10))
         } else {
             // the outcome is not yet determined
             None

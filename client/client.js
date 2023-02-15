@@ -232,7 +232,7 @@ events.addEventListener("notification", (event) => {
 
 events.addEventListener("credentials", (event) => {
    credentials = event.data;
-   console.log("Notification: ",event.data);
+   console.log("Credentials: ",event.data);
 })
 
         
