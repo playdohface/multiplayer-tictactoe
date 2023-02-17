@@ -35,6 +35,7 @@ async fn main() -> Result<(), std::io::Error> {
             .service(game_events)
             .service(getgame)
             .service(addmove)
+            .service(rematch)
             .service(fs::Files::new("/{gameid}", "client"))
             .wrap(Logger::default())
     })
@@ -46,7 +47,9 @@ async fn main() -> Result<(), std::io::Error> {
 
 #[get("/")]
 async fn index() -> impl Responder {
-    "Hello"
+    let file = format!("client/index.html");
+    let path: PathBuf = file.parse().unwrap();
+    NamedFile::open(path).unwrap()
 }
 
 #[get("/newgame")]
@@ -59,6 +62,25 @@ async fn newgame(games: web::Data<GameManager>) -> impl Responder {
             .finish(),
         Err(e) => HttpResponse::InternalServerError().finish(),
     }
+}
+
+#[get("/{game_id}/rematch/{credentials}")]
+async fn rematch (pathdata: web::Path<(String, String)>, gm: web::Data<GameManager>) -> impl Responder {
+    let (id, cred) = pathdata.into_inner();
+    match gm.getgame(id.clone()) {
+        Some(g) => {
+            if g.rematch(cred).await {
+                HttpResponse::Ok().finish()
+            } else {
+                HttpResponse::InternalServerError().finish()
+            }           
+        }
+        None => {
+            log::error!("Could not find game!");
+            HttpResponse::NotFound().finish()
+        }
+    }
+
 }
 
 #[get("/{game_id}/game")]

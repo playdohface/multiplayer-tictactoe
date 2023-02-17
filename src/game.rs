@@ -2,7 +2,7 @@
 
 use actix_web_lab::sse::{self, ChannelStream};
 use std::sync::{Arc, Mutex};
-use crate::tictactoe::{self, Board};
+use crate::tictactoe::{self, Board, Player};
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,6 +58,7 @@ struct GameInner {
     pub board: tictactoe::Board,
     players: [Option<ActivePlayer>; 2],
     spectators: Vec<sse::Sender>,
+    started: bool,
 
 }
 impl Game {
@@ -67,6 +68,7 @@ impl Game {
                 board: tictactoe::Board::new(),
                 players: [None, None],
                 spectators: Vec::new(),
+                started: false,
 
             }),
         })
@@ -116,6 +118,23 @@ impl Game {
     async fn try_recover(&self) -> bool {
         false
     }
+    async fn check_ready(&self) {
+        let players = self.game_ok().await;
+        let mut g =  self.inner.lock().unwrap();
+        if players.is_ok() && !g.started {
+            g.started = true;
+            for i in 0..2 {
+                    if let Some(p) = &g.players[i] {
+                    p.stream.send(sse::Data::new("").event("startgame")).await;
+                    match i {
+                        0 => {p.notify("Game Ready, make the first move!").await;},
+                        1 => {p.notify("Game Ready! You are Player O, wait for your opponents move.").await;},
+                        _ => ()
+                    }
+                }             
+            }
+        }
+    }
     pub async fn join(&self) -> sse::Sse<ChannelStream> {
         let (tx, rx) = sse::channel(30);
         match self.healtchcheck().await {
@@ -123,6 +142,8 @@ impl Game {
                 self.try_recover();
             }
             Ok(true) => {
+                tx.send(sse::Data::new("").event("startgame")).await;
+
                 tx.send(sse::Data::new("You are a spectator in this game").event("notification")).await;
                 self.inner.lock().unwrap().spectators.push(tx);
                
@@ -144,8 +165,26 @@ impl Game {
                 }
             }
         }
-        self.show().await;
+        self.check_ready().await;       
         rx
+    }
+
+    pub async fn rematch(&self, cred: String) -> bool {
+        match self.healtchcheck().await {
+            Ok(true) => (),
+            _ => { return false; }
+        }
+        let mut g = self.inner.lock().unwrap();
+        if  !(g.players[0].as_ref().unwrap().credentials == cred || g.players[1].as_ref().unwrap().credentials == cred) {
+            return false;
+        }
+        g.players.swap(0, 1);
+        g.board = tictactoe::Board::new();
+        g.started = false;
+        drop(g);
+        self.check_ready().await;
+        //self.show().await;
+        true
     }
 
     pub async fn addmove(&self, newmove: usize, cred: String) -> bool {
@@ -174,12 +213,12 @@ impl Game {
     pub async fn show(&self) {
         log::info!("Showing Game");
         match self.inner.lock() {
-            Ok(g) => {
-                let boardstate = serde_json::to_string(&GameInfo {
-                    gamestate: g.board.show(),
-                    nextup: g.board.next_turn,
-                    outcome: g.board.get_winner(),
-                })
+            Ok(g) => { 
+                let gameinfo = GameInfo {
+                gamestate: g.board.show(),
+                outcome: g.board.get_winner(),
+                };
+                let boardstate = serde_json::to_string(&gameinfo)
                 .unwrap();
                 let turn = match g.board.next_turn {
                     tictactoe::Player::X => 0,
@@ -188,11 +227,13 @@ impl Game {
                 for i in 0..2 {
                     if let Some(p) = g.players[i].clone() {
                         p.stream.send(sse::Data::new(boardstate.clone())).await;
-                        if turn == i {
-                            p.notify(&*format!("Your turn, {}!", g.board.next_turn)).await;
-                        } else {
-                            p.notify("Wait for your opponent").await;
-                        }                       
+                        if gameinfo.outcome == None {
+                            if turn == i {
+                                p.notify(&*format!("Your turn, {}!", g.board.next_turn)).await;
+                            } else {
+                                p.notify("Wait for your opponent").await;
+                            } 
+                        }                      
                     }
                 }
 
@@ -211,7 +252,7 @@ impl Game {
 #[derive(Debug, Serialize)]
 struct GameInfo {
     gamestate: [tictactoe::Field; 9],
-    nextup: tictactoe::Player,
+
     outcome: Option<(tictactoe::Field, usize)>,
 }
 
@@ -222,6 +263,23 @@ mod tests {
     use actix_web::http::{header, StatusCode};
 
     use super::*;
+
+    #[actix_web::test]
+    async fn rematch_works() {
+        let g = Game::new();
+        let s1 = g.join().await;
+        assert_eq!(Ok(false), g.healtchcheck().await);
+        let s2 = g.join().await;
+        assert_eq!(Ok(true), g.healtchcheck().await);
+        let cred1 = g.inner.lock().as_ref().unwrap().players[0].as_ref().unwrap().credentials.clone();
+        let cred2 = g.inner.lock().as_ref().unwrap().players[1].as_ref().unwrap().credentials.clone();
+        assert!(g.rematch(cred1.clone()).await);
+        let credafter1 = g.inner.lock().as_ref().unwrap().players[0].as_ref().unwrap().credentials.clone();
+        let credafter2 = g.inner.lock().as_ref().unwrap().players[1].as_ref().unwrap().credentials.clone();
+        assert_eq!(cred1, credafter2);
+        assert_eq!(cred2, credafter1);
+    }
+
     #[actix_web::test]
     async fn can_add_moves() {
         let g = Game::new();

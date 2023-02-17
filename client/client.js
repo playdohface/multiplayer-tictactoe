@@ -148,6 +148,16 @@ let addmove = (fieldindex) => {
         });
 }
 
+let rematch = () => {
+   fetch('./rematch/'.concat(credentials), { method: 'GET' })
+   .then((response) => {
+      if(response.status === 200){
+         overlay.style.display = "none";
+      };
+   });
+
+}
+
 let updatefields = (gamestate) => {
    fields.forEach((field, i) => {
       //console.log(field.getAttribute("state"), " ==? ", data[i]);
@@ -197,32 +207,56 @@ let showvictory = (condition) => {
    }
 }
 
+let copy_url = () => {
+   var copyText = document.getElementById("urlfield");
+   copyText.select();
+   copyText.setSelectionRange(0, 99999); 
+   navigator.clipboard.writeText(copyText.value);
+}
+
+let init_board = () => {
+   board.innerHTML = '<div class="overlay"></div>';
+   overlay.style.display = "none";
+   fields = [];
+   board.style.display = "grid";
+   for (let i = 0 ; i <= 8 ; i++) {
+      let newelem = document.createElement("div");
+      newelem.className = "field";
+      newelem.setAttribute("state", "Empty");
+      newelem.addEventListener("click", () => {
+         addmove(i);
+      });
+      fields.push(newelem);
+      board.append(newelem);
+   }
+}
 let notifications = document.getElementById("notifications");
 let board = document.getElementById("board");
+let overlay = document.querySelector(".overlay");
+board.style.display = "none";
+let urldiv = document.getElementById("url");
 let fields = [];
 let credentials = "";
+urldiv.innerHTML = '<input id="urlfield" type="url" value="' + window.location.href + '"/><button onclick="copy_url()">Copy URL to Clipboard</button>';
 
-for (let i = 0 ; i <= 8 ; i++) {
-    let newelem = document.createElement("div");
-    newelem.className = "field";
-    newelem.setAttribute("state", "Empty");
-    newelem.addEventListener("click", () => {
-        addmove(i);
-    });
-    fields.push(newelem);
-    board.append(newelem);
-}
+//init_board();
 
 let events = new EventSource("./events");
 events.onmessage = (event) => {
     let data = JSON.parse(event.data);
     let gamestate = data.gamestate;
-    let nextup = data.nextup;
     let outcome = data.outcome;
+
     console.log(data);
     updatefields(gamestate);
     if (outcome) {
       showvictory(outcome[1]);
+      console.log("Outcome:: ",  outcome[0]);
+      if (outcome[0] === 'Empty') {
+         notifications.innerHTML = "It's a draw! " + '<button onclick="rematch()">Rematch!</button>';
+      } else {
+         notifications.innerHTML = "Player " + outcome[0] +" wins! " + '<button onclick="rematch()">Rematch!</button>';
+      }
     }
 }
 events.addEventListener("notification", (event) => {
@@ -235,5 +269,11 @@ events.addEventListener("credentials", (event) => {
    console.log("Credentials: ",event.data);
 })
 
+events.addEventListener("startgame", (event) => {  
+   console.log("Start Game!");
+   urldiv.style.display = "none";
+   document.getElementById("urllabel").style.display = "none";
+   init_board();
+})
         
 

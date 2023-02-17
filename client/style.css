@@ -5,8 +5,18 @@ body {
     margin: 0;
     box-sizing: border-box;
 }
-.boardcontainer {
+#url {
+    margin: 0 auto;
+    /* border: 1px solid red; */
+    display: flex;
+    justify-content: center;
+}
 
+#url input {
+    width: 22em;
+    margin-right: 0.5em;
+}
+.boardcontainer {
     display:flex;
     justify-content: center;
 }
@@ -18,6 +28,7 @@ h1 {
 .title {
     color: #fff;
     font-size: 3em;
+    margin-bottom: 0;
     text-shadow:
     -1px -1px 0 #000,
     1px -1px 0 #000,
@@ -30,7 +41,7 @@ h1 {
     font-family: 'Permanent Marker', cursive;
     padding: 1em;
     background: transparent;
-    margin-top:30px;
+    margin-top:0px;
     text-align: center;
     margin-left: auto;
     margin-right: auto;
@@ -63,17 +74,24 @@ h1 {
 .field:hover{
 border: 1px dashed green;
 }
+.centered {
+    display: flex;
+    justify-content: center;
+}
 
 #board {
+    
     position:relative;
-    width: 70vmin;
-    height: 70vmin; 
+    width: 95vmin;
+    max-width: 500px;
+    height: 95vmin; 
+    max-height: 500px;
 
     background: radial-gradient(#000000FF 0, #00000000 90%, #FFFFFF 100%);
     background-size: contain;
     margin-left: auto;
     margin-right: auto;
-    margin-top: 20px;
+    margin-top: 10px;
     display:grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3,1fr);
