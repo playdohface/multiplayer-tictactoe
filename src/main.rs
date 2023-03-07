@@ -31,6 +31,7 @@ async fn main() -> Result<(), std::io::Error> {
         App::new()
             .app_data(web::Data::from(Arc::clone(&gm)))
             .service(index)
+            .service(healthcheck)
             .service(newgame)
             .service(game_events)
             .service(getgame)
@@ -50,6 +51,11 @@ async fn index() -> impl Responder {
     let file = format!("client/index.html");
     let path: PathBuf = file.parse().unwrap();
     NamedFile::open(path).unwrap()
+}
+
+#[get("/healthcheck")]
+async fn healthcheck() -> impl Responder {
+    HttpResponse::Ok().finish()
 }
 
 #[get("/newgame")]
