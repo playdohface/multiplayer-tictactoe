@@ -144,6 +144,7 @@ border: 1px dashed green;
 .scribble {
     stroke-dasharray: 2000;
     stroke-dashoffset: 2000;
+    animation-delay: 0.5s;
     animation: scribbleanim 2s linear;
     animation-fill-mode: forwards;
     stroke: #FFFFFF;

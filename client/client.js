@@ -204,14 +204,22 @@ let showvictory = (condition) => {
        case 7:
            overlay.innerHTML = graphics.diag2;
            break;
+       case 10:
+           overlay.innerHTML = graphics.scribble;
+           break; 
    }
 }
 
-let copy_url = () => {
+let copy_url = async (sharedata) => {
    var copyText = document.getElementById("urlfield");
    copyText.select();
-   copyText.setSelectionRange(0, 99999); 
-   navigator.clipboard.writeText(copyText.value);
+   copyText.setSelectionRange(0, 99999);
+   
+   if (navigator.share && navigator.canShare(sharedata)) {  
+      await navigator.share(sharedata);
+   } else {
+      navigator.clipboard.writeText(copyText.value);
+   }
 }
 
 let init_board = () => {
@@ -237,7 +245,12 @@ board.style.display = "none";
 let urldiv = document.getElementById("url");
 let fields = [];
 let credentials = "";
-urldiv.innerHTML = '<input id="urlfield" type="url" value="' + window.location.href + '"/><button onclick="copy_url()">Copy URL to Clipboard</button>';
+let sharedata = {
+   title: 'Challenge',
+   text: 'You have been challenged to a game of Tic Tac Toe!',
+   url: window.location.href
+ };
+urldiv.innerHTML = '<input id="urlfield" type="url" value="' + window.location.href + '"/><button onclick="copy_url(sharedata)">' + (navigator.share && navigator.canShare(sharedata) ? 'Share' : 'Copy URL to Clipboard') + '</button>';
 
 //init_board();
 

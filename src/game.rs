@@ -73,6 +73,24 @@ impl Game {
             }),
         })
     }
+
+    ///True if a game has no players or the mutex is poisoned
+    pub async fn is_dead(&self) -> bool {
+        let g = match self.inner.lock() {
+            Ok(g) => g,
+            Err(_) => { return true;}
+        };
+        let p1 = match &g.players[0] {
+            Some(p) => p.ping().await,
+            _ => false
+        };
+        let p2 = match &g.players[1] {
+            Some(p) => p.ping().await,
+            _ => false
+        };
+        !(p1 || p2)
+    }
+
     async fn game_ok(&self) -> Result<[ActivePlayer;2], GameError> {
         if !self.healtchcheck().await? {
             return Err(GameError::MissingPlayer);
@@ -100,24 +118,27 @@ impl Game {
             //self.inner.clear_poison();
             return Err(GameError::PoisonedMutex);
         }
-        let players = &mut self.inner.lock().unwrap().players;       
+        let players = &mut self.inner.lock().unwrap().players;
+              
         for player in players {
             ready = ready && match player {
                 Some(p) => { 
                     if !p.ping().await {
                         *player = None;
+                        
                         false
                     } else { true } 
                 },
-                None => false
-            }
+                None => {
+                    
+                    false
+                }
+            };
         }
+        
         Ok(ready)       
     }
     
-    async fn try_recover(&self) -> bool {
-        false
-    }
     async fn check_ready(&self) {
         let players = self.game_ok().await;
         let mut g =  self.inner.lock().unwrap();
@@ -135,11 +156,12 @@ impl Game {
             }
         }
     }
+    ///Add a player to the game, if there are two players present add spectator 
     pub async fn join(&self) -> sse::Sse<ChannelStream> {
         let (tx, rx) = sse::channel(30);
         match self.healtchcheck().await {
             Err(_) => {
-                self.try_recover();
+                false;
             }
             Ok(true) => {
                 tx.send(sse::Data::new("").event("startgame")).await;
@@ -168,7 +190,7 @@ impl Game {
         self.check_ready().await;       
         rx
     }
-
+    /// start a new game, keep players
     pub async fn rematch(&self, cred: String) -> bool {
         match self.healtchcheck().await {
             Ok(true) => (),
@@ -186,7 +208,7 @@ impl Game {
         //self.show().await;
         true
     }
-
+    /// add a move to the game
     pub async fn addmove(&self, newmove: usize, cred: String) -> bool {
         log::info!("Move: {newmove}, Credentials: {cred}");
         let mut players; 
@@ -210,6 +232,7 @@ impl Game {
         }
         
     }
+    /// broadcast the game state
     pub async fn show(&self) {
         log::info!("Showing Game");
         match self.inner.lock() {
@@ -265,6 +288,20 @@ mod tests {
     use super::*;
 
     #[actix_web::test]
+    async fn game_with_no_players_is_dead() {
+        let g = Game::new();
+        assert!(g.inner.lock().unwrap().players[0].is_none());
+        assert!(g.inner.lock().unwrap().players[1].is_none());
+        //assert!(g.healtchcheck().await.is_err());
+        assert!(g.is_dead().await);
+        let p1 = g.join().await;
+        assert!(!g.is_dead().await);
+        drop(p1);
+        g.healtchcheck();
+        assert!(g.is_dead().await);
+    }
+
+    #[actix_web::test]
     async fn rematch_works() {
         let g = Game::new();
         let s1 = g.join().await;
@@ -295,12 +332,10 @@ mod tests {
         assert!(g.addmove(7, players[1].credentials.clone()).await);
         assert!(None == g.inner.lock().unwrap().board.get_winner());
         assert!(g.addmove(2, players[0].credentials.clone()).await);
-        assert!(Some((tictactoe::Field::X, 0)) == g.inner.lock().unwrap().board.get_winner());
-        
-        assert!(!g.addmove(8, players[1].credentials.clone()).await);       
-       
-     
+        assert!(Some((tictactoe::Field::X, 0)) == g.inner.lock().unwrap().board.get_winner());     
+        assert!(!g.addmove(8, players[1].credentials.clone()).await);        
     }
+
     #[actix_web::test]
     async fn can_join_empty_game() {
         let g = Game::new();
@@ -309,6 +344,7 @@ mod tests {
         let s2 = g.join().await;
         assert_eq!(Ok(true), g.healtchcheck().await);        
     }
+
     #[actix_web::test]
     async fn rejoin_when_player_drops() {
         let g = Game::new();
@@ -334,6 +370,16 @@ mod tests {
         assert_eq!(1, g.inner.lock().unwrap().spectators.len());
         drop(s3);
         assert!(g.game_ok().await.is_ok());
+    }
+
+    #[actix_web::test]
+    async fn when_receiver_drops_ping_errors() {
+        let (tx, rx) = sse::channel(5);
+        let m = tx.send(sse::Event::Comment("ping".into())).await;
+        assert!(m.is_ok());
+        drop(rx);
+        let m = tx.send(sse::Event::Comment("ping".into())).await;
+        assert!(m.is_err());
     }
 
     #[actix_web::test]

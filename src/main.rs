@@ -18,14 +18,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+pub mod game;
 pub mod gamemanager;
 pub mod tictactoe;
-pub mod game;
 
 #[actix_web::main]
 async fn main() -> Result<(), std::io::Error> {
     let gm = GameManager::init();
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("error"));
 
     HttpServer::new(move || {
         App::new()
@@ -39,7 +39,7 @@ async fn main() -> Result<(), std::io::Error> {
             .service(fs::Files::new("/{gameid}", "client"))
             .wrap(Logger::default())
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .workers(4)
     .run()
     .await
@@ -65,7 +65,10 @@ async fn newgame(games: web::Data<GameManager>) -> impl Responder {
 }
 
 #[get("/{game_id}/rematch/{credentials}")]
-async fn rematch (pathdata: web::Path<(String, String)>, gm: web::Data<GameManager>) -> impl Responder {
+async fn rematch(
+    pathdata: web::Path<(String, String)>,
+    gm: web::Data<GameManager>,
+) -> impl Responder {
     let (id, cred) = pathdata.into_inner();
     match gm.getgame(id.clone()) {
         Some(g) => {
@@ -73,14 +76,13 @@ async fn rematch (pathdata: web::Path<(String, String)>, gm: web::Data<GameManag
                 HttpResponse::Ok().finish()
             } else {
                 HttpResponse::InternalServerError().finish()
-            }           
+            }
         }
         None => {
             log::error!("Could not find game!");
             HttpResponse::NotFound().finish()
         }
     }
-
 }
 
 #[get("/{game_id}/game")]
